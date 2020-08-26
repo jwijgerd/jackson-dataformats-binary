@@ -168,7 +168,15 @@ public class TypeResolver
                         }
                     }
                 }
-            } else {
+            } /*else if(fieldType instanceof DataType.MapType) {
+                // where the key_type can be any integral or string type (so, any scalar type except for floating point
+                // types and bytes).
+                // Note that enum is not a valid key_type. The value_type can be any type except another map
+                DataType.MapType mapType = (DataType.MapType) fieldType;
+                // need to resolve the MapFieldEntry
+                pbf = new ProtobufField(f, f.)
+
+            }*/ else {
                 throw new IllegalArgumentException(String.format(
                         "Unrecognized DataType '%s' for field '%s'", fieldType.getClass().getName(), f.name()));
             }

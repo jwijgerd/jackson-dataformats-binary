@@ -1,8 +1,12 @@
 package com.fasterxml.jackson.dataformat.protobuf.schemagen;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.ByteBuffer;
 
 import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.util.ClassUtil;
+import com.squareup.protoparser.DataType;
 
 public class ProtobufSchemaHelper
 {
@@ -14,8 +18,7 @@ public class ProtobufSchemaHelper
         return (pkg == null) ? "" : pkg.getName();
     }
 
-    /* 31-Mar-2017, tatu: Shouldn't be needed...
-    public static ScalarType getScalarType(JavaType type) {
+    public static DataType.ScalarType getScalarType(JavaType type) {
         Class<?> raw = type.getRawClass();
         if (raw.isPrimitive()) {
             raw = ClassUtil.wrapperType(raw);
@@ -47,7 +50,6 @@ public class ProtobufSchemaHelper
         }
         return null;
     }
-    */
 
     public static boolean hasIndex(BeanProperty writer) {
         return writer.getMetadata().hasIndex();

@@ -64,6 +64,8 @@ public class SchemaGenTest extends ProtobufTestBase
 		public String[] emails;
 
 		public Employee boss;
+
+		public List<Employee> directReports;
     }
 
     /*

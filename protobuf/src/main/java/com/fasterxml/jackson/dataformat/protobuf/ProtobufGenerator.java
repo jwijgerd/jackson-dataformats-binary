@@ -257,6 +257,7 @@ public class ProtobufGenerator extends GeneratorBase
             _reportError("Can not write field name: current context not Object but "+_pbContext.typeDesc());
         }
         ProtobufField f = _currField;
+        boolean isMapKey = false;
         // important: use current field only if NOT repeated field; repeated
         // field means an array until START_OBJECT
         if (f != null && _pbContext.notArray()) {
@@ -266,6 +267,12 @@ public class ProtobufGenerator extends GeneratorBase
             }
         } else  {
             f = _currMessage.firstIf(name);
+        }
+        if( f == null) {
+            // this can also happen for the key part of a map
+            f = _currMessage.field("key");
+            // if we have a field, we need to write the value as a string
+            isMapKey = f != null;
         }
         if (f == null) {
             // May be ok, if we have said so
@@ -280,6 +287,9 @@ public class ProtobufGenerator extends GeneratorBase
         }
         _pbContext.setField(f);
         _currField = f;
+        if(isMapKey) {
+            writeString(name);
+        }
     }
 
     @Override

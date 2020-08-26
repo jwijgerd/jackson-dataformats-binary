@@ -5,10 +5,14 @@ import java.util.Set;
 
 import com.fasterxml.jackson.core.JsonParser.NumberType;
 import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.jsonFormatVisitors.*;
 
+import com.fasterxml.jackson.databind.type.MapLikeType;
 import com.squareup.protoparser.DataType;
+import com.squareup.protoparser.FieldElement;
+import com.squareup.protoparser.MessageElement;
 import com.squareup.protoparser.TypeElement;
 import com.squareup.protoparser.DataType.ScalarType;
 
@@ -91,9 +95,52 @@ public class ProtoBufSchemaVisitor extends JsonFormatVisitorWrapper.Base
 
 	@Override
 	public JsonMapFormatVisitor expectMapFormat(JavaType mapType) {
+	    // https://developers.google.com/protocol-buffers/docs/proto#maps_features
          // 31-Mar-2017, tatu: I don't think protobuf v2 really supports map types natively,
 	    //   and we can't quite assume anything specific can we?
-		return _throwUnsupported("'Map' type not supported as type by protobuf module");
+
+        // inject the MapFieldEntry type
+        final MapLikeType javaType = (MapLikeType) mapType;
+        final DataType keyType = ProtobufSchemaHelper.getScalarType(javaType.getKeyType());
+        if(keyType == null || keyType == ScalarType.DOUBLE || keyType == ScalarType.FLOAT || keyType == ScalarType.BYTES) {
+            throw new IllegalArgumentException("Key of Map must be a scalar type (expect DOUBLE, FLOAT and BYTES)");
+        }
+        final DataType valueType = ProtobufSchemaHelper.getScalarType(javaType.getContentType()) != null ?
+                ProtobufSchemaHelper.getScalarType(javaType.getContentType()) :
+                DataType.NamedType.create(javaType.getContentType().getRawClass().getSimpleName());
+        _definedTypeElementBuilders.addTypeElement(mapType, new TypeElementBuilder() {
+            @Override
+            public TypeElement build() {
+                return MessageElement.builder()
+                        .name("MapFieldEntry")
+                        .addField(
+                                FieldElement.builder()
+                                        .tag(1)
+                                        .label(FieldElement.Label.OPTIONAL)
+                                        .name("key")
+                                        .type(keyType).build())
+                        .addField(
+                                FieldElement.builder()
+                                        .tag(2)
+                                        .label(FieldElement.Label.OPTIONAL)
+                                        .name("value")
+                                        .type(valueType).build())
+                        .build();
+            }
+        }, false);
+        // _simpleType = DataType.MapType.create(keyType, valueType);
+        _simpleType = DataType.NamedType.create("MapFieldEntry");
+        return new JsonMapFormatVisitor.Base() {
+            @Override
+            public void keyFormat(JsonFormatVisitable handler, JavaType keyType) throws JsonMappingException {
+                super.keyFormat(handler, keyType);
+            }
+
+            @Override
+            public void valueFormat(JsonFormatVisitable handler, JavaType valueType) throws JsonMappingException {
+                super.valueFormat(handler, valueType);
+            }
+        };
 	}
 
 	@Override
@@ -102,11 +149,58 @@ public class ProtoBufSchemaVisitor extends JsonFormatVisitorWrapper.Base
          if (ProtobufSchemaHelper.isBinaryType(type)) {
               _simpleType = ScalarType.BYTES;
               return null;
+         } else {
+             ArrayElementVisitor visitor = new ArrayElementVisitor(_provider, type, _definedTypeElementBuilders) {
+                 // called only for simple types
+                 @Override
+                 public void itemsFormat(JsonFormatTypes format) throws JsonMappingException {
+                     // TODO: support more types
+                     switch(format) {
+                         case INTEGER:
+                             _simpleType = ScalarType.INT32;
+                             break;
+                         case BOOLEAN:
+                             _simpleType = ScalarType.BOOL;
+                             break;
+                         case NUMBER:
+                             _simpleType = ScalarType.DOUBLE;
+                             break;
+                         case STRING:
+                             _simpleType = ScalarType.STRING;
+                             break;
+                         default:
+                            _throwUnsupported();
+                     }
+
+                 }
+             };
+             _builder = visitor;
+             // add as a nested type so it is removed from the build later
+             _definedTypeElementBuilders.addTypeElement(type, visitor, true);
+             return visitor;
+             /*
+             return new JsonArrayFormatVisitor.Base() {
+                 // called for complex object types
+                 @Override
+                 public void itemsFormat(JsonFormatVisitable handler, JavaType elementType) throws JsonMappingException {
+                     // TODO: implement this
+                     if(_definedTypeElementBuilders.containsBuilderFor(elementType)) {
+
+                     }
+                 }
+                 // called only for simple types
+                 @Override
+                 public void itemsFormat(JsonFormatTypes format) throws JsonMappingException {
+                     // TODO: support more types
+                     _simpleType = ScalarType.INT32;
+                 }
+             };
+              */
          }
          
          // !!! TODO: surely we should support array types, right?
          
-         return _throwUnsupported("'Map' type not supported as type by protobuf module");
+         // return _throwUnsupported("'Array' type not supported as type by protobuf module");
 	}
 
     /*

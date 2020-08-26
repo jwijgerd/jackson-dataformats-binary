@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonFormatVisitable;
 import com.fasterxml.jackson.databind.jsonFormatVisitors.JsonObjectFormatVisitor;
 
+import com.fasterxml.jackson.databind.type.MapLikeType;
 import com.squareup.protoparser.DataType;
 import com.squareup.protoparser.DataType.NamedType;
 import com.squareup.protoparser.DataType.ScalarType;
@@ -50,8 +51,8 @@ public class MessageElementVisitor extends JsonObjectFormatVisitor.Base
     }
 
     @Override
-    public void property(String name, JsonFormatVisitable handler, JavaType propertyTypeHint) {
-        throw new UnsupportedOperationException();
+    public void property(String name, JsonFormatVisitable handler, JavaType propertyTypeHint) throws JsonMappingException {
+        _builder.addField(buildFieldElement(name, propertyTypeHint, Label.REQUIRED));
     }
 
     @Override
@@ -60,8 +61,8 @@ public class MessageElementVisitor extends JsonObjectFormatVisitor.Base
     }
 
     @Override
-    public void optionalProperty(String name, JsonFormatVisitable handler, JavaType propertyTypeHint) {
-        throw new UnsupportedOperationException();
+    public void optionalProperty(String name, JsonFormatVisitable handler, JavaType propertyTypeHint) throws JsonMappingException {
+        _builder.addField(buildFieldElement(name, propertyTypeHint, Label.OPTIONAL));
     }
 
     protected FieldElement buildFieldElement(BeanProperty writer, Label label) throws JsonMappingException
@@ -81,9 +82,83 @@ public class MessageElementVisitor extends JsonObjectFormatVisitor.Base
                 fBuilder.label(Label.REPEATED);
                 fBuilder.type(getDataType(type.getContentType()));
             }
+        } else if(type.isMapLikeType()) {
+            fBuilder.label(Label.REPEATED);
+            fBuilder.type(NamedType.create("MapFieldEntry"));
+            if(!_definedTypeElementBuilders.containsBuilderFor(type)) {
+                final MapLikeType javaType = (MapLikeType) type;
+                final DataType keyType = ProtobufSchemaHelper.getScalarType(javaType.getKeyType());
+                if(keyType == null || keyType == ScalarType.DOUBLE || keyType == ScalarType.FLOAT || keyType == ScalarType.BYTES) {
+                    throw new IllegalArgumentException("Key of Map must be a scalar type (expect DOUBLE, FLOAT and BYTES)");
+                }
+                final DataType valueType = ProtobufSchemaHelper.getScalarType(javaType.getContentType()) != null ?
+                        ProtobufSchemaHelper.getScalarType(javaType.getContentType()) :
+                        DataType.NamedType.create(javaType.getContentType().getRawClass().getSimpleName());
+                _definedTypeElementBuilders.addTypeElement(type, new TypeElementBuilder() {
+                    @Override
+                    public TypeElement build() {
+                        return MessageElement.builder()
+                                .name("MapFieldEntry")
+                                .addField(
+                                        FieldElement.builder()
+                                                .tag(1)
+                                                .label(FieldElement.Label.OPTIONAL)
+                                                .name("key")
+                                                .type(keyType).build())
+                                .addField(
+                                        FieldElement.builder()
+                                                .tag(2)
+                                                .label(FieldElement.Label.OPTIONAL)
+                                                .name("value")
+                                                .type(valueType).build())
+                                .build();
+                    }
+                }, false);
+            }
         } else {
             fBuilder.label(label);
             fBuilder.type(getDataType(type));
+            // we need to check whether this is defined as an array by the Serializer implementation
+            if(_definedTypeElementBuilders.containsBuilderFor(type) &&
+                    _definedTypeElementBuilders.getBuilderFor(type) instanceof ArrayElementVisitor) {
+                fBuilder.label(Label.REPEATED);
+            }
+        }
+        return fBuilder.build();
+    }
+
+    protected FieldElement buildFieldElement(String name, JavaType type, Label label) throws JsonMappingException {
+        FieldElement.Builder fBuilder = FieldElement.builder();
+
+        fBuilder.name(name);
+        if(_tagGenerator != null && _tagGenerator instanceof DefaultTagGenerator) {
+            fBuilder.tag(((DefaultTagGenerator) _tagGenerator).nextTag());
+        } else if(_tagGenerator == null) {
+            _tagGenerator = new DefaultTagGenerator();
+            fBuilder.tag(((DefaultTagGenerator) _tagGenerator).nextTag());
+        } else {
+            throw new IllegalStateException("Annotated properties (with 'JsonProperty.index') are not supported");
+        }
+
+        if (type.isArrayType() || type.isCollectionLikeType()) {
+            if (ProtobufSchemaHelper.isBinaryType(type)) {
+                fBuilder.label(label);
+                fBuilder.type(ScalarType.BYTES);
+            } else {
+                fBuilder.label(Label.REPEATED);
+                fBuilder.type(getDataType(type.getContentType()));
+            }
+        } else if(type.isMapLikeType()) {
+            fBuilder.label(Label.REPEATED);
+            fBuilder.type(NamedType.create("MapFieldEntry"));
+        }  else {
+            fBuilder.label(label);
+            fBuilder.type(getDataType(type));
+            // we need to check whether this is defined as an array by the Serializer implementation
+            if(_definedTypeElementBuilders.containsBuilderFor(type) &&
+                    _definedTypeElementBuilders.getBuilderFor(type) instanceof ArrayElementVisitor) {
+                fBuilder.label(Label.REPEATED);
+            }
         }
         return fBuilder.build();
     }
