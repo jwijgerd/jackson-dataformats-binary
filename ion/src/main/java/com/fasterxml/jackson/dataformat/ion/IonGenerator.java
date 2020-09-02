@@ -26,6 +26,7 @@ import com.fasterxml.jackson.core.base.GeneratorBase;
 import com.fasterxml.jackson.core.io.IOContext;
 import com.fasterxml.jackson.core.json.DupDetector;
 import com.fasterxml.jackson.core.type.WritableTypeId;
+import com.fasterxml.jackson.core.util.JacksonFeatureSet;
 import com.fasterxml.jackson.core.util.SimpleTokenWriteContext;
 import com.amazon.ion.IonType;
 import com.amazon.ion.IonValue;
@@ -185,6 +186,11 @@ public class IonGenerator
 
     @Override
     public boolean canWriteBinaryNatively() { return true; }
+
+    @Override
+    public JacksonFeatureSet<StreamWriteCapability> getWriteCapabilities() {
+        return DEFAULT_BINARY_WRITE_CAPABILITIES;
+    }
 
     /*
     /**********************************************************************

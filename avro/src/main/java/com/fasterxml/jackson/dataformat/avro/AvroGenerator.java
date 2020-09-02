@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Objects;
 
+import com.fasterxml.jackson.core.util.JacksonFeatureSet;
 import org.apache.avro.io.BinaryEncoder;
 
 import com.fasterxml.jackson.core.*;
@@ -224,6 +225,11 @@ public class AvroGenerator extends GeneratorBase
     //   only add in 2.11
     @Override // since 2.11
     public boolean canWriteBinaryNatively() { return true; }
+
+    @Override
+    public JacksonFeatureSet<StreamWriteCapability> getWriteCapabilities() {
+        return DEFAULT_BINARY_WRITE_CAPABILITIES;
+    }
 
     /*
     /**********************************************************************

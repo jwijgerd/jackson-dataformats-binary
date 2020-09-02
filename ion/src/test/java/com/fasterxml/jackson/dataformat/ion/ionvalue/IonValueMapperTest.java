@@ -44,7 +44,7 @@ public class IonValueMapperTest {
     private final IonSystem ionSystem = IonSystemBuilder.standard().build();
     private final IonFactory ionF = IonFactory.builderForTextualWriters().ionSystem(ionSystem).build();
     private final IonObjectMapper ionValueMapper = IonObjectMapper.builder(ionF)
-            .propertyNamingStrategy(PropertyNamingStrategy.SNAKE_CASE)
+            .propertyNamingStrategy(new PropertyNamingStrategies.SnakeCaseStrategy())
             .build();
 
     enum ReturnCode {
@@ -182,7 +182,7 @@ public class IonValueMapperTest {
     public void testPojo4WithSexpInArrayIgnored() throws Exception {
         IonObjectMapper mapper = IonObjectMapper.builder(ionF)
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-                .propertyNamingStrategy(PropertyNamingStrategy.SNAKE_CASE)
+                .propertyNamingStrategy(new PropertyNamingStrategies.SnakeCaseStrategy())
                 .build();
         String value = "{value:[([])], number:\"Random\"}";
         TestPojo4 test = mapper.readValue(ionSystem.singleValue(value), TestPojo4.class);
@@ -195,7 +195,7 @@ public class IonValueMapperTest {
     public void testPojo5WithSexpInArray() throws Exception {
         IonObjectMapper mapper = IonObjectMapper.builder(ionF)
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-                .propertyNamingStrategy(PropertyNamingStrategy.SNAKE_CASE)
+                .propertyNamingStrategy(new PropertyNamingStrategies.SnakeCaseStrategy())
                 .build();
 
         String value = "{value:[([blah])], number:\"Random\"}";
